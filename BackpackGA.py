@@ -34,16 +34,30 @@ class BackpackGA:
         return total_value if total_weight <= self.max_weight else 0
 
     def evolve_population(self, population: List[List[int]], items: List[tuple], max_weight: int, generations: int) -> List[List[int]]:
-        for _ in range(generations):
-            new_population = []
+        def tournament_selection(population: List[List[int]], k=3) -> List[int]:
+            selected = random.sample(population, k)
+            return max(selected, key=self.fitness)
+
+        for gen in range(generations):
             population.sort(key=lambda ind: self.fitness(ind), reverse=True)
-            elite = population[:2]
+            elite = population[:2]  # топ-2 особини
+
+            new_population = elite.copy()  # Явне збереження еліти
+
             while len(new_population) < len(population):
-                p1, p2 = random.choices(elite + population, k=2)
+                p1 = tournament_selection(population)
+                p2 = tournament_selection(population)
                 child = self.mutate(self.crossover(p1, p2))
                 new_population.append(child)
+
             population = new_population
+
+            if self.verbose:
+                best_fit = self.fitness(population[0])
+                self.log(f"Покоління {gen+1}: найкраща цінність = {best_fit}")
+
         return population
+
 
     def run(self):
         num_items = len(self.items)

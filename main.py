@@ -49,25 +49,25 @@ if __name__ == "__main__":
     max_weight = 5000
 
     start_time = time.time()
-    gaSeq = sequntialGA.BackpackGA(items, max_weight, population_size=2000, generations=10, mutation_rate=0.1)
+    gaSeq = sequntialGA.BackpackGA(items, max_weight, population_size=20, generations=10, mutation_rate=0.1)
     best_individual_seq = gaSeq.run()
     seq_time = time.time() - start_time
 
 
-    # start_time = time.time()
-    # gaPar = parallelGA.BackpackGAParralel(items, max_weight, population_size=200, generations=100, mutation_rate=0.1, verbose=False)
-    # best_individual_par = gaPar.run(12)
-    # par_time = time.time() - start_time
+    start_time = time.time()
+    gaPar = parallelGA.BackpackGAParralel(items, max_weight, population_size=200, generations=100, mutation_rate=0.1, verbose=False)
+    best_individual_par = gaPar.run(12)
+    par_time = time.time() - start_time
 
     start_time = time.time()
-    gaMaster = masterSlaveGA.MasterSlaveBackpackGA(items, max_weight, population_size=2000, generations=10, mutation_rate=0.1)
+    gaMaster = masterSlaveGA.MasterSlaveBackpackGA(items, max_weight, population_size=20, generations=10, mutation_rate=0.1)
     best_individual_master = gaMaster.run(12)
     master_time = time.time() - start_time
 
     print("\n=== Результати порівняння ===")
     print(f"Послідовний алгоритм: {seq_time:.2f} сек")
-    # print(f"Паралельний алгоритм Island: {par_time:.2f} сек")
-    # print(f"Прискорення Island: {seq_time/par_time:.2f}x")
+    print(f"Паралельний алгоритм Island: {par_time:.2f} сек")
+    print(f"Прискорення Island: {seq_time/par_time:.2f}x")
     print(f"Паралельний алгоритм Master-Slave: {master_time:.2f} сек")
     print(f"Прискорення Master-Slave: {seq_time/master_time:.2f}x")
 

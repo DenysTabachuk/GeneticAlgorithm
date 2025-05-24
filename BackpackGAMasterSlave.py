@@ -1,51 +1,35 @@
 import random
 from typing import List
-from multiprocessing import Pool, cpu_count
+from multiprocessing import Pool
 from BackpackGA import BackpackGA
 
 class BackpackGAMasterSlave(BackpackGA):
-    def __init__(self, *args, num_processes=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.num_processes = num_processes or cpu_count()
+    def _mutate_crossover(self, p1: List[int], p2: List[int]) -> List[int]:
+        child = self._crossover(p1, p2)
+        return self._mutate(child)
 
-    def _fitness_wrapper(self, individual):
-        return self._fitness(individual)
-
-    def _child_generator(self, args):
-        p1, p2 = args
-        return self._mutate(self._crossover(p1, p2))
-
-    def _evolve_population(self, population: List[List[int]], generations: int) -> List[List[int]]:
-        with Pool(processes=self.num_processes) as pool:
-            for _ in range(generations):
-                # Паралельне обчислення fitness
-                fitness_scores = pool.map(self._fitness_wrapper, population)
-                
-                # Сортування популяції за спаданням fitness
+    def _evolve_population(self, population: List[List[int]],  num_threads: int) -> List[List[int]]:
+        with Pool(processes=num_threads) as pool:
+            for gen in range(self.generations):
+                fitness_scores = pool.map(self._fitness, population)
                 sorted_population = [ind for _, ind in sorted(zip(fitness_scores, population), key=lambda pair: pair[0], reverse=True)]
                 elite = sorted_population[:2]
-
-                # Формування пар для кросоверу
                 mating_pool = elite + sorted_population
                 num_children = len(population)
                 parent_pairs = [random.choices(mating_pool, k=2) for _ in range(num_children)]
+                population = pool.starmap(self._mutate_crossover, parent_pairs)
 
-                # Паралельне створення потомків
-                population = pool.map(self._child_generator, parent_pairs)
+                best_fit = self._fitness(population[0])
+                self._log(f"Покоління {gen+1}/{self.generations}: найкращий fitness = {best_fit:.4f}")
 
         return population
 
-    def run(self, num_processes=None):
-        if num_processes is not None:
-            self.num_processes = num_processes
-
+    def run(self, num_threads: int, verbose: bool = False):
+        self.verbose = verbose
         num_items = len(self.items)
         population = [self._create_individual(num_items) for _ in range(self.population_size)]
-
-        population = self._evolve_population(population, self.generations)
-
-        best_individual = max(population, key=lambda ind: self._fitness(ind))
+        final_population = self._evolve_population(population, num_threads)
+        best_individual = max(final_population, key=lambda ind: self._fitness(ind))
         best_value = sum(self.items[i][1] for i in range(num_items) if best_individual[i] == 1)
         best_weight = sum(self.items[i][0] for i in range(num_items) if best_individual[i] == 1)
-
         return best_individual, best_value, best_weight

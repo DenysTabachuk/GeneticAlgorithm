@@ -64,10 +64,7 @@ class BackpackGA:
             population = self._evolve_population(population, 1)
 
         best_individual = max(population, key=lambda ind: self._fitness(ind))
-        total_weight = sum(self.items[i][0] for i in range(num_items) if best_individual[i] == 1)
+        best_value = self._fitness(best_individual)
+        best_weight = sum(self.items[i][0] for i in range(num_items) if best_individual[i] == 1)
 
-        self._log("\nПослідовний алгоритм:")
-        self._log("Цінність: " + str(self._fitness(best_individual)))
-        self._log("Вага: " + str(total_weight))
-
-        return best_individual
+        return best_individual, best_value, best_weight

@@ -73,15 +73,12 @@ class BackpackGAIslandModel(BackpackGA):
                 p.join()
 
         self._log("Обробка результатів...")
-        best_overall = max(
+        best_individual = max(
             (ind for pop in final_populations.values() for ind in pop),
             key=lambda ind: self._fitness(ind)
         )
-        best_value = self._fitness(best_overall)
-        best_weight = sum(self.items[i][0] for i in range(num_items) if best_overall[i] == 1)
 
-        self._log("\nПаралельний алгоритм:")
-        self._log("Цінність: " + str(best_value))
-        self._log("Вага: " + str(best_weight))
+        best_value = sum(self.items[i][1] for i in range(num_items) if best_individual[i] == 1)
+        best_weight = sum(self.items[i][0] for i in range(num_items) if best_individual[i] == 1)
 
-        return best_overall, best_value, best_weight
+        return best_individual, best_value, best_weight

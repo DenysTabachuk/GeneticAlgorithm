@@ -1,5 +1,6 @@
 import random
 from typing import List
+import time
 
 class BackpackGA:
     def __init__(self, items: List[tuple], max_weight: int, population_size=20, generations=50, mutation_rate=0.1, verbose=False):
@@ -9,7 +10,7 @@ class BackpackGA:
         self.generations = generations
         self.mutation_rate = mutation_rate
         self.verbose = verbose
-        self.population = [self._create_individual(len(items)) for _ in range(population_size)]
+        self.population = []
 
     def _log(self, msg):
         if self.verbose:
@@ -19,17 +20,41 @@ class BackpackGA:
         return [random.randint(0, 1) for _ in range(num_items)]
 
     def _crossover(self, p1: List[int], p2: List[int]) -> List[int]:
-        return [gene1 if random.random() < 0.7 else gene2 for gene1, gene2 in zip(p1, p2)]
+        fitness_p1 = self._fitness(p1)
+        fitness_p2 = self._fitness(p2)
+
+        # Визначаємо, хто сильніший
+        if fitness_p1 > fitness_p2:
+            better, worse = p1, p2
+        else:
+            better, worse = p2, p1
+
+        prob_better = 0.75  # Ймовірність взяти ген від кращого батька
+
+        child = []
+        for i in range(len(p1)):
+            if random.random() < prob_better:
+                child.append(better[i])
+            else:
+                child.append(worse[i])
+
+        return child
+
 
     def _mutate(self, individual: List[int], mutation_rate=None) -> List[int]:
         if mutation_rate is None:
             mutation_rate = self.mutation_rate
         return [bit if random.random() > mutation_rate else 1 - bit for bit in individual]
 
-    def _fitness(self, individual: List[int]) -> int:
+    def _fitness(self, individual: List[int]) -> float:
         total_weight = sum(self.items[i][0] for i in range(len(self.items)) if individual[i] == 1)
         total_value = sum(self.items[i][1] for i in range(len(self.items)) if individual[i] == 1)
-        return total_value if total_weight <= self.max_weight else 0
+
+        if total_weight > self.max_weight:
+            return 0
+
+        # Якщо вага в межах, додаємо невеликий бонус за меншу вагу (щоб віддавати перевагу легшим варіантам)
+        return total_value - 0.1 * total_weight
 
     def _evolve_population(self, population: List[List[int]], generations: int) -> List[List[int]]:
         def tournament_selection(population: List[List[int]], k=3) -> List[int]:
@@ -64,7 +89,8 @@ class BackpackGA:
             population = self._evolve_population(population, 1)
 
         best_individual = max(population, key=lambda ind: self._fitness(ind))
-        best_value = self._fitness(best_individual)
+        best_value = sum(self.items[i][1] for i in range(num_items) if best_individual[i] == 1)
         best_weight = sum(self.items[i][0] for i in range(num_items) if best_individual[i] == 1)
+
 
         return best_individual, best_value, best_weight

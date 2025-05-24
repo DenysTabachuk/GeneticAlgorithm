@@ -11,11 +11,10 @@ def generate_items(num_items=100):
     max_weight = 0
     for _ in range(num_items):
         weight = random.randint(1, 20)  
-        value = random.randint(5, 20)  
+        value = random.randint(5, 100)  
         items.append((weight, value))
         max_weight += weight
-    max_weight = int(max_weight * 0.8)
-    return items, max_weight
+    return items
 
 
 def test_sequential(runs=5, **kwargs):
@@ -43,25 +42,26 @@ def _test_against_known_optimum(algorithm_class, runs=5, label="", **kwargs):
 if __name__ == "__main__":
     # test_sequential(runs=10, verbose=False)
     # test_parallel(runs=10, verbose=False)
+    random.seed(42)
 
-    items, max_weight = generate_items(num_items=1000)
+    items = generate_items(num_items=1000)
     max_weight = 5000
 
     # Запуск послідовного алгоритму
     start_time = time.time()
-    gaSeq = sequntialGA.BackpackGA(items, max_weight, population_size=100, generations=10, mutation_rate=0.1)
+    gaSeq = sequntialGA.BackpackGA(items, max_weight, population_size=20, generations=100, mutation_rate=0.1)
     best_solution, value, weight = gaSeq.run()
     seq_time = time.time() - start_time
 
     # Запуск паралельного алгоритму Island Model
     start_time = time.time()
-    gaPar = parallelGA.BackpackGAIslandModel(items, max_weight, population_size=100, generations=10, mutation_rate=0.1, verbose=False)
+    gaPar = parallelGA.BackpackGAIslandModel(items, max_weight, population_size=20, generations=100, mutation_rate=0.1, verbose=False)
     best_solution_par, value_par, weight_par = gaPar.run(12)
     par_time = time.time() - start_time
 
     # Запуск паралельного алгоритму Master-Slave
     start_time = time.time()
-    gaMaster = masterSlaveGA.BackpackGAMasterSlave(items, max_weight, population_size=100, generations=10, mutation_rate=0.1)
+    gaMaster = masterSlaveGA.BackpackGAMasterSlave(items, max_weight, population_size=20, generations=100, mutation_rate=0.1)
     best_sol_master, val_master, wt_master = gaMaster.run(12)
     master_time = time.time() - start_time
 

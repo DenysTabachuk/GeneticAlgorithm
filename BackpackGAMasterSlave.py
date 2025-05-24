@@ -45,11 +45,7 @@ class BackpackGAMasterSlave(BackpackGA):
         population = self._evolve_population(population, self.generations)
 
         best_individual = max(population, key=lambda ind: self._fitness(ind))
-        best_value = self._fitness(best_individual)
+        best_value = sum(self.items[i][1] for i in range(num_items) if best_individual[i] == 1)
         best_weight = sum(self.items[i][0] for i in range(num_items) if best_individual[i] == 1)
-
-        self._log("\nMaster-Slave алгоритм (з постійним пулом процесів):")
-        self._log("Цінність: " + str(best_value))
-        self._log("Вага: " + str(best_weight))
 
         return best_individual, best_value, best_weight

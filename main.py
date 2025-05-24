@@ -49,19 +49,19 @@ if __name__ == "__main__":
 
     # Запуск послідовного алгоритму
     start_time = time.time()
-    gaSeq = sequntialGA.BackpackGA(items, max_weight, population_size=20, generations=100, mutation_rate=0.1)
+    gaSeq = sequntialGA.BackpackGA(items, max_weight, population_size=200, generations=100, mutation_rate=0.1)
     best_solution, value, weight = gaSeq.run()
     seq_time = time.time() - start_time
 
     # Запуск паралельного алгоритму Island Model
     start_time = time.time()
-    gaPar = parallelGA.BackpackGAIslandModel(items, max_weight, population_size=20, generations=100, mutation_rate=0.1, verbose=False)
+    gaPar = parallelGA.BackpackGAIslandModel(items, max_weight, population_size=200, generations=100, mutation_rate=0.1, verbose=True)
     best_solution_par, value_par, weight_par = gaPar.run(12)
     par_time = time.time() - start_time
 
     # Запуск паралельного алгоритму Master-Slave
     start_time = time.time()
-    gaMaster = masterSlaveGA.BackpackGAMasterSlave(items, max_weight, population_size=20, generations=100, mutation_rate=0.1)
+    gaMaster = masterSlaveGA.BackpackGAMasterSlave(items, max_weight, population_size=200, generations=100, mutation_rate=0.1)
     best_sol_master, val_master, wt_master = gaMaster.run(12)
     master_time = time.time() - start_time
 

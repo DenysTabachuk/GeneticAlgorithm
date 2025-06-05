@@ -1,90 +1,218 @@
 import random
-from typing import List
 import time
+import pandas as pd
 import BackpackGA as sequntialGA
 import BackpackGAIslandModel as parallelGA
 import BackpackGAMasterSlave as masterSlaveGA
 
+import os
 
-def generate_items(num_items=100):  
+def get_logical_cores() -> int:
+    try:
+        return os.cpu_count() or 1
+    except Exception:
+        return 1
+
+def generate_items(num_items=100):
     items = []
-    max_weight = 0
+    total_weight = 0
     for _ in range(num_items):
-        weight = random.randint(1, 20)  
-        value = random.randint(5, 100)  
+        weight = random.randint(1, 20)
+        value = random.randint(5, 100)
         items.append((weight, value))
-        max_weight += weight
-    return items
+        total_weight += weight
+    return items, total_weight
 
 
-def test_sequential(runs=5, **kwargs):
-    _test_against_known_optimum(sequntialGA.BackpackGA, runs=runs, label="Послідовний", **kwargs)
+def run_comparison_tests(
+    population_sizes=[100, 200, 300, 400, 500],
+    generations_list=[100, 200, 300],
+    num_threads_list=[4, 8, 12, 16],
+    num_items=100,
+    mutation_rate=0.1,
+    num_cores=12,
+    num_runs=4  
+):
+    random.seed(42)
+    items, total_weight = generate_items(num_items)
+    max_weight = int(total_weight * 0.4)
 
-def test_parallel(runs=5, **kwargs):
-    _test_against_known_optimum(parallelGA.BackpackGAIslandModel, runs=runs, label="Паралельний", **kwargs)
+    results = []
 
-def _test_against_known_optimum(algorithm_class, runs=5, label="", **kwargs):
-    known_items = [(2, 3), (1, 2), (3, 4), (2, 2)]
-    max_weight = 6
-    expected_value = 9
+    for population_size in population_sizes:
+        for generations in generations_list:
+            for num_threads in num_threads_list:
 
-    success_count = 0
-    for i in range(runs):
-        ga = algorithm_class(known_items, max_weight, **kwargs)
-        best = ga.run()
-        fitness_val = ga.fitness(best)
-        if fitness_val == expected_value:
-            success_count += 1
+                seq_times, par_times, ms_times = [], [], []
+                val_seq_list, val_par_list, val_ms_list = [], [], []
 
-    print(f"\n{label} — збіг з оптимумом: {success_count} з {runs} ({(success_count/runs)*100:.1f}%)")
+                for _ in range(num_runs):
+                    # === Послідовний алгоритм ===
+                    gaSeq = sequntialGA.BackpackGA(
+                        items,
+                        max_weight,
+                        population_size=population_size,
+                        generations=generations,
+                        mutation_rate=mutation_rate,
+                        verbose=False,
+                    )
+                    start_time = time.time()
+                    _, val_seq, _ = gaSeq.run()
+                    seq_times.append(time.time() - start_time)
+                    val_seq_list.append(val_seq)
+
+                    # === Island Model ===
+                    gaPar = parallelGA.BackpackGAIslandModel(
+                        items,
+                        max_weight,
+                        population_size=population_size,
+                        generations=generations,
+                        mutation_rate=mutation_rate,
+                        verbose=False,
+                    )
+                    start_time = time.time()
+                    _, val_par, _ = gaPar.run(num_threads)
+                    par_times.append(time.time() - start_time)
+                    val_par_list.append(val_par)
+
+                    # === Master-Slave ===
+                    gaMaster = masterSlaveGA.BackpackGAMasterSlave(
+                        items,
+                        max_weight,
+                        population_size=population_size,
+                        generations=generations,
+                        mutation_rate=mutation_rate,
+                        verbose=False,
+                    )
+                    start_time = time.time()
+                    _, val_master, _ = gaMaster.run(num_cores)
+                    ms_times.append(time.time() - start_time)
+                    val_ms_list.append(val_master)
+
+                # === Усереднені метрики ===
+                avg_seq_time = sum(seq_times) / num_runs
+                avg_par_time = sum(par_times) / num_runs
+                avg_ms_time = sum(ms_times) / num_runs
+
+                avg_val_seq = sum(val_seq_list) / num_runs
+                avg_val_par = sum(val_par_list) / num_runs
+                avg_val_ms = sum(val_ms_list) / num_runs
+
+                island_speedup = avg_seq_time / avg_par_time if avg_par_time > 0 else float('inf')
+                ms_speedup = avg_seq_time / avg_ms_time if avg_ms_time > 0 else float('inf')
+
+                island_eff = island_speedup / num_cores
+                ms_eff = ms_speedup / num_cores
+
+                results.append({
+                    "Pop.Size": population_size,
+                    "Generations": generations,
+                    "Threads": num_threads,
+                    "Max Weight": max_weight,
+                    "Seq.Time (s)": round(avg_seq_time, 2),
+                    "Island.Time (s)": round(avg_par_time, 2),
+                    "MS.Time (s)": round(avg_ms_time, 2),
+                    "Seq Value": round(avg_val_seq, 1),
+                    "Island Value": round(avg_val_par, 1),
+                    "MS Value": round(avg_val_ms, 1),
+                    "Island Speedup": round(island_speedup, 2),
+                    "MS Speedup": round(ms_speedup, 2),
+                    "Island Eff.": round(island_eff, 2),
+                    "MS Eff.": round(ms_eff, 2),
+                })
+
+                print(
+                    f"Done: Pop={population_size}, Gen={generations}, Threads={num_threads} "
+                    f"(Avg over {num_runs} runs) → Seq={avg_seq_time:.2f}s, Island={avg_par_time:.2f}s, MS={avg_ms_time:.2f}s"
+                )
+
+    df = pd.DataFrame(results)
+    df.to_csv("comparison_results_avg.csv", index=False)
+    print("\n=== Середні результати після кількох прогонів ===\n")
+    print(df.to_string(index=False))
+
+
 
 
 if __name__ == "__main__":
-    # test_sequential(runs=10, verbose=False)
-    # test_parallel(runs=10, verbose=False)
-    random.seed(42)
+    print(f"Кількість логічних ядер: {get_logical_cores()}")
 
-    items = generate_items(num_items=1000)
-    max_weight = 5000
-
-    # Запуск послідовного алгоритму
-    start_time = time.time()
-    gaSeq = sequntialGA.BackpackGA(items, max_weight, population_size=100, generations=100, mutation_rate=0.1)
-    best_solution, value, weight = gaSeq.run()
-    seq_time = time.time() - start_time
-
-    # Запуск паралельного алгоритму Island Model
-    start_time = time.time()
-    gaPar = parallelGA.BackpackGAIslandModel(items, max_weight, population_size=100, generations=100, mutation_rate=0.1, verbose=False)
-    best_solution_par, value_par, weight_par = gaPar.run(12)
-    par_time = time.time() - start_time
-
-    # Запуск паралельного алгоритму Master-Slave
-    start_time = time.time()
-    gaMaster = masterSlaveGA.BackpackGAMasterSlave(items, max_weight, population_size=100, generations=100, mutation_rate=0.1)
-    best_sol_master, val_master, wt_master = gaMaster.run(12)
-    master_time = time.time() - start_time
+    run_comparison_tests()
 
 
-    # Вивід результатів
-    print("\n=== Результати виконання алгоритмів ===\n")
+# if __name__ == "__main__":
+#     print(f"Кількість логічних ядер: {get_logical_cores()}")
 
-    print("Послідовний алгоритм:")
-    print(f"  Цінність: {value}")
-    print(f"  Вага:     {weight}")
-    print(f"  Час:     {seq_time:.2f} сек\n")
+#     # === Параметри ===
+#     population_size = 500
+#     generations = 100
+#     num_threads = 12 
+#     mutation_rate = 0.1
+#     num_items = 100
 
-    print("Паралельний алгоритм Island Model:")
-    print(f"  Цінність: {value_par}")
-    print(f"  Вага:     {weight_par}")
-    print(f"  Час:     {par_time:.2f} сек")
-    print(f"  Прискорення: {seq_time/par_time:.2f}x\n")
+#     random.seed(42)
+#     items, total_weight = generate_items(num_items)
+#     max_weight = int(total_weight * 0.4)
 
-    print("Паралельний алгоритм Master-Slave:")
-    print(f"  Цінність: {val_master}")
-    print(f"  Вага:     {wt_master}")
-    print(f"  Час:     {master_time:.2f} сек")
-    print(f"  Прискорення: {seq_time/master_time:.2f}x\n")
+#     # === Послідовний алгоритм ===
+#     ga_seq = sequntialGA.BackpackGA(
+#         items,
+#         max_weight,
+#         population_size=population_size,
+#         generations=generations,
+#         mutation_rate=mutation_rate,
+#         verbose=False,
+#     )
+#     start = time.time()
+#     best_seq, val_seq, wt_seq = ga_seq.run()
+#     time_seq = time.time() - start
 
+#     # === Island Model ===
+#     ga_island = parallelGA.BackpackGAIslandModel(
+#         items,
+#         max_weight,
+#         population_size=population_size,
+#         generations=generations,
+#         mutation_rate=mutation_rate,
+#         verbose=False,
+#     )
+#     start = time.time()
+#     best_island, val_island, wt_island = ga_island.run(num_threads)
+#     time_island = time.time() - start
 
+#     # === Master-Slave ===
+#     ga_ms = masterSlaveGA.BackpackGAMasterSlave(
+#         items,
+#         max_weight,
+#         population_size=population_size,
+#         generations=generations,
+#         mutation_rate=mutation_rate,
+#         verbose=False,
+#     )
+#     start = time.time()
+#     best_ms, val_ms, wt_ms = ga_ms.run(num_threads)
+#     time_ms = time.time() - start
 
+#     # === Вивід результатів ===
+#     print("\n=== Порівняння алгоритмів ===")
+#     print(f"Популяція: {population_size}, Покоління: {generations}")
+#     print(f"Макс. вага: {max_weight}")
+
+#     print(f"\n[Послідовний]")
+#     print(f"Час: {time_seq:.2f} с, Вага: {wt_seq}, Цінність: {val_seq}")
+
+#     print(f"\n[Island Model] (Потоки: {num_threads})")
+#     print(f"Час: {time_island:.2f} с, Вага: {wt_island}, Цінність: {val_island}")
+
+#     print(f"\n[Master-Slave] (Ядер: {num_threads})")
+#     print(f"Час: {time_ms:.2f} с, Вага: {wt_ms}, Цінність: {val_ms}")
+
+#     # === Прискорення та ефективність ===
+#     print("\n=== Прискорення та ефективність ===")
+#     speedup_island = time_seq / time_island if time_island > 0 else float('inf')
+#     speedup_ms = time_seq / time_ms if time_ms > 0 else float('inf')
+#     eff_island = speedup_island / get_logical_cores()
+#     eff_ms = speedup_ms / get_logical_cores()
+
+#     print(f"Island Speedup: {speedup_island:.2f}, Efficiency: {eff_island:.2f}")
+#     print(f"Master-Slave Speedup: {speedup_ms:.2f}, Efficiency: {eff_ms:.2f}")

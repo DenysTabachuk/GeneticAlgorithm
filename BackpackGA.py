@@ -1,4 +1,5 @@
 import random
+import time
 from typing import List, Tuple
 
 class BackpackGA:
@@ -18,6 +19,11 @@ class BackpackGA:
         self.mutation_rate: float = mutation_rate
         self.verbose: bool = verbose
 
+    def _tournament_selection(self, pop: List[List[int]], k: int = 3) -> List[int]:
+        selected: List[List[int]] = random.sample(pop, k)
+        return max(selected, key=self._fitness)
+
+
     def _log(self, msg: str) -> None:
         if self.verbose:
             print(msg)
@@ -34,7 +40,7 @@ class BackpackGA:
         else:
             better, worse = p2, p1
 
-        prob_better: float = 0.75
+        prob_better: float = 0.55
         child: List[int] = []
         for i in range(len(p1)):
             if random.random() < prob_better:
@@ -44,7 +50,14 @@ class BackpackGA:
         return child
 
     def _mutate(self, individual: List[int]) -> List[int]:
-        return [bit if random.random() > self.mutation_rate else 1 - bit for bit in individual]
+        mutated = []
+        for bit in individual:
+            if random.random() <= self.mutation_rate:
+                mutated.append(1 - bit)  # інверсія: 0 → 1, 1 → 0
+            else:
+                mutated.append(bit)  # залишаємо як є
+        return mutated
+
 
     def _fitness(self, individual: List[int]) -> float:
         total_weight: int = sum(
@@ -58,10 +71,6 @@ class BackpackGA:
         return total_value - 0.1 * total_weight
 
     def _evolve_population(self, population: List[List[int]], generations: int) -> List[List[int]]:
-        def tournament_selection(pop: List[List[int]], k: int = 3) -> List[int]:
-            selected: List[List[int]] = random.sample(pop, k)
-            return max(selected, key=self._fitness)
-
         for gen in range(generations):
             population.sort(key=self._fitness, reverse=True)
             elite: List[List[int]] = population[:2]
@@ -69,8 +78,8 @@ class BackpackGA:
             new_population: List[List[int]] = elite.copy()
 
             while len(new_population) < len(population):
-                p1: List[int] = tournament_selection(population)
-                p2: List[int] = tournament_selection(population)
+                p1: List[int] = self._tournament_selection(population)
+                p2: List[int] = self._tournament_selection(population)
                 child: List[int] = self._mutate(self._crossover(p1, p2))
                 new_population.append(child)
 
@@ -78,7 +87,8 @@ class BackpackGA:
 
             if self.verbose:
                 best_fit: float = self._fitness(population[0])
-                # self._log(f"Покоління {gen+1}: найкраща цінність = {best_fit}")
+                # self._log(f"Покоління {gen+1}: найкраща цінність = {best_fit}, вага = {sum(self.items[i][0] for i in range(len(self.items)) if population[0][i] == 1)}")
+                # self._log(f"Найкращий індивід: {population[0]}")
 
         return population
 

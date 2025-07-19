@@ -19,6 +19,7 @@ class BackpackGA:
         self.mutation_rate: float = mutation_rate
         self.verbose: bool = verbose
 
+    # Випадково оберемо k особин, і з них візьмемо ту, яка найкраща. Саме вона буде обрана для схрещування
     def _tournament_selection(self, pop: List[List[int]], k: int = 3) -> List[int]:
         selected: List[List[int]] = random.sample(pop, k)
         return max(selected, key=self._fitness)
